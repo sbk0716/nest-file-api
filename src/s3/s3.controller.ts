@@ -56,6 +56,12 @@ export class S3Controller {
     type: FileUploadDto,
   })
   async uploadFile(@Req() req: FastifyRequest, @Res() res: FastifyReply): Promise<any> {
+    // const data = await req.file()
+    // console.log('+++++++++++++++++++++++++++++++++++')
+    // console.log(data.filename)
+    // console.log(data.encoding)
+    // console.log(data.mimetype)
+    // console.log('+++++++++++++++++++++++++++++++++++')
     return this.s3Service.uploadFile(req, res)
   }
 }
