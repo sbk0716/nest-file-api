@@ -22,7 +22,7 @@ export class S3Controller {
 
   @Get('/download-file/:fileName')
   @ApiOperation({
-    summary: 'Execute TaskController.downloadFile()',
+    summary: 'Execute S3Controller.downloadFile()',
     description: 'file download',
   })
   @ApiResponse({
@@ -46,26 +46,16 @@ export class S3Controller {
   @Post('/upload-file')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Execute TaskController.uploadFile()',
+    summary: 'Execute S3Controller.uploadFile()',
     description: 'file upload',
   })
   @ApiResponse({
     status: 200,
-    description: 'You have successfully uploaded a file.',
+    description: 'You have successfully uploaded multiple files.',
   })
   @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        uploadFiles: {
-          type: 'array', // 👈  array of files
-          items: {
-            type: 'string',
-            format: 'binary',
-          },
-        },
-      },
-    },
+    description: 'File list to upload',
+    type: FileUploadDto,
   })
   async uploadFile(@Req() req: FastifyRequest): Promise<Array<AWS.S3.ManagedUpload.SendData>> {
     // Check request is multipart
