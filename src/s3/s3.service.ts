@@ -1,28 +1,30 @@
-import { createReadStream } from 'fs';
 import {
   Injectable,
   HttpException, 
   StreamableFile,
-  BadRequestException, 
   HttpStatus,
   Logger,
 } from '@nestjs/common';
 import { AppResponseDto } from './dto/app-response.dto';
-const mime = require('mime-types')
+import * as stream from 'stream';
 import * as fs from 'fs';
-
 import * as AWS from 'aws-sdk';
 // import { commonConfig } from '../configs/common';
-import { DownloadParams } from './utils/downloadParams';
-import { UploadParams } from './utils/uploadParams';
+// import { DownloadParams } from './utils/downloadParams';
+// import { UploadParams } from './utils/uploadParams';
 import { FastifyRequest, FastifyReply } from 'fastify'
-
-const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// const mime = require('mime-types')
+import * as mime from 'mime-types';
+// const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { MultipartFile } from 'fastify-multipart';
 
 @Injectable()
 export class S3Service {
-  async downloadFile(fileName): Promise<{ contentType:string, streamableFile: StreamableFile }> {
+  async downloadFile(fileName: string): Promise<{ contentType: string, streamableFile: StreamableFile }> {
     const bucketName = process.env.BUCKET_NAME || 'gw-report-export'
+    /**
+     * @todo
+     */
     const key = `test/${fileName}`
     const config = { region: process.env.REGION };
     if (process.env.NODE_ENV === 'development') {
@@ -34,102 +36,58 @@ export class S3Service {
       Bucket: bucketName,
       Key: key,
     };
-    // const s3Object: AWS.S3.GetObjectOutput = await s3
-    //   .getObject(getParams)
-    //   .promise()
-    //   .catch((err) => {
-    //     Logger.error(`[ERROR] - ${err?.message}`);
-    //     throw new HttpException(
-    //       {
-    //         status: HttpStatus.INTERNAL_SERVER_ERROR,
-    //         error: `${err?.message}`,
-    //       },
-    //       HttpStatus.INTERNAL_SERVER_ERROR,
-    //     );
-    //   });
-    // if (s3Object?.ContentLength === 0) {
-    //   Logger.error(
-    //     `[ERROR] - ContentLength is zero! [ContentLength: ${s3Object?.ContentLength}]`,
-    //   );
-    //   throw new HttpException(
-    //     {
-    //       status: HttpStatus.BAD_REQUEST,
-    //       error: `ContentLength is zero! [ContentLength: ${s3Object?.ContentLength}]`,
-    //     },
-    //     HttpStatus.BAD_REQUEST,
-    //   );
-    // }
-    const stream = s3.getObject(getParams).createReadStream();
-    console.log(stream)
+    /**
+     * @see https://dev.to/ldsrogan/aws-sdk-with-javascript-download-file-from-s3-el2
+     */
+    const request = s3.getObject(getParams)
+    const srcStream = request.createReadStream()
     const templatePath = `.tmp/${fileName}`;
-    // create a write stream with the path including file name and its extension that you want to store the file in your directory.
-    const ostream = fs.createWriteStream(templatePath);
-    // using node.js pipe method to pipe the writestream
-    stream.pipe(ostream);
-    await _sleep(5000);
-    // uploads/sample.png
+    const dstStream = fs.createWriteStream(templatePath);
+
+    /**
+     * fileWrite
+     * @param src 
+     * @param dst 
+     */
+    const fileWrite = async (src: stream.Readable, dst: fs.WriteStream) => {
+      let count = 0;
+      let total = 0
+      for await (const chunk of src) {
+        count++;
+        total += chunk.length;
+        // console.log(chunk.toString("utf8"));
+        // The writable.write() method writes some data to the stream
+        dst.write(chunk)
+      }
+      console.log(`${count}回に分けて取得しました`);
+      console.log(`合計${total}byte取得しました`);
+    }
+
+    // execute fileWrite
+    await fileWrite(srcStream, dstStream).catch((e) => {
+      console.error('[ERROR]execute fileWrite')
+      console.error(e)
+    });
     const contentType = mime.lookup(`.tmp/${fileName}`)
-    console.log(contentType);
-    const file = createReadStream(`.tmp/${fileName}`);
+    console.log('contentType=', contentType);
+    const file = fs.createReadStream(`.tmp/${fileName}`);
     const streamableFile = new StreamableFile(file)
     return {
       contentType,
       streamableFile
     };
-    // const str = s3Object.Body.toString('utf-8');
-    // // console.log(str)
-    // const contentType = s3Object.ContentType
-    // console.log(contentType)
-    // const buffer = Buffer.from(str, "utf-8");
-    // console.log(buffer)
-    // const contentType = s3Object.ContentType
-    // const templatePath = `.tmp/${fileName}`;
-    // fs.writeFileSync(templatePath, str);
-    // const file = createReadStream(`.tmp/${fileName}`);
-    // const contentType = mime.lookup(`.tmp/${fileName}`)
-    // const contentType = mime.lookup(`.tmp/${fileName}`)
-    // const file = fs.createReadStream(`.tmp/${fileName}`);
-    // console.log(contentType);
-    // console.log('++++++++++++++++++++++++++++++++++++++=');
-    // const streamableFile = new StreamableFile(file)
-    // console.log(streamableFile)
-    // return {
-    //   contentType,
-    //   streamableFile
-    // };
   }
-  // async downloadFile(fileName): Promise<{ contentType:string, streamableFile: StreamableFile }> {
-  //   // uploads/sample.png
-  //   const contentType = mime.lookup(`uploads/${fileName}`)
-  //   console.log(contentType);
-  //   const file = createReadStream(`uploads/${fileName}`);
-  //   const streamableFile = new StreamableFile(file)
-  //   return {
-  //     contentType,
-  //     streamableFile
-  //   };
-  // }
+
   // upload file
-  async uploadFile(req: FastifyRequest, reply: FastifyReply): Promise<any> {
-    // Check request is multipart
-    if (!req.isMultipart()) {
-      reply.send(new BadRequestException(
-        new AppResponseDto(400, undefined, 'Request is not multipart'),
-      ))
-      return 
-    }
-    const data = await req.file()
-    console.log('!!+++++++++++++++++++++++++++++++++++')
-    console.log(data)
-    console.log(data.fieldname)
-    console.log(data.filename)
-    console.log(data.encoding)
-    console.log(data.mimetype)
-    console.log(data.fields)
-    console.log('!!+++++++++++++++++++++++++++++++++++')
+  async uploadFile(data: MultipartFile): Promise<AWS.S3.ManagedUpload.SendData> {
     const buffer = await data.toBuffer()
+    console.log('+++++++++++++++++++++++++++++++++++')
     console.log(buffer)
+    console.log('+++++++++++++++++++++++++++++++++++')
     const bucketName = process.env.BUCKET_NAME || 'gw-report-export'
+    /**
+     * @todo
+     */
     const key = `test/${data.filename}`
     const uploadParams = {
       Bucket: bucketName,
@@ -158,7 +116,6 @@ export class S3Service {
         );
       });
     Logger.log(`[INFO] - sendData.Key is ${sendData?.Key}`);
-    reply.code(200).send(new AppResponseDto(200, undefined, 'Data uploaded successfully'))
     return sendData;
   }
   // async s3upload(params: UploadParams): Promise<AWS.S3.ManagedUpload.SendData> {
