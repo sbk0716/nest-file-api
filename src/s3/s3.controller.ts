@@ -28,7 +28,7 @@ export class S3Controller {
     description: 'You have successfully downloaded a file.',
   })
   async downloadFile(
-    @Response({ passthrough: true }) res,
+    @Response({ passthrough: true }) res: FastifyReply,
     @Param('fileName') fileName: string
     ): Promise<StreamableFile> {
     const { contentType, streamableFile } = await this.s3Service.downloadFile(fileName)
@@ -40,6 +40,19 @@ export class S3Controller {
     });
     return streamableFile
   }
+  // async downloadFile(
+  //   @Response({ passthrough: true }) res,
+  //   @Param('fileName') fileName: string
+  //   ): Promise<StreamableFile> {
+  //   const { contentType, streamableFile } = await this.s3Service.downloadFile(fileName)
+  //   const uuid = uuidv4()
+
+  //   res.headers({
+  //     'Content-Type': `${contentType}`,
+  //     'Content-Disposition': `attachment; filename="${uuid}"`,
+  //   });
+  //   return streamableFile
+  // }
 
   @Post('/upload-file')
   @ApiConsumes('multipart/form-data')
