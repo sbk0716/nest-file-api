@@ -54,10 +54,20 @@ export class S3Controller {
     description: 'You have successfully uploaded a file.',
   })
   @ApiBody({
-    description: 'file object',
-    type: FileUploadDto,
+    schema: {
+      type: 'object',
+      properties: {
+        uploadFiles: {
+          type: 'array', // 👈  array of files
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+        },
+      },
+    },
   })
-  async uploadFile(@Req() req: FastifyRequest): Promise<AWS.S3.ManagedUpload.SendData> {
+  async uploadFile(@Req() req: FastifyRequest): Promise<Array<AWS.S3.ManagedUpload.SendData>> {
     // Check request is multipart
     if (!req.isMultipart()) {
       throw new HttpException(
@@ -68,17 +78,21 @@ export class S3Controller {
         HttpStatus.BAD_REQUEST,
       );
     }
-    const data: MultipartFile = await req.file()
-    console.log('!!+++++++++++++++++++++++++++++++++++')
-    console.log(data)
-    console.log(data.fieldname)
-    console.log(data.filename)
-    console.log(data.encoding)
-    console.log(data.mimetype)
-    console.log(data.fields)
-    console.log('!!+++++++++++++++++++++++++++++++++++')
-    const sendData = await this.s3Service.uploadFile(data)
-    console.log('sendData=', sendData)
-    return sendData
+    const parts: AsyncIterableIterator<MultipartFile> = req.files()
+    const results = []
+    for await (const data of parts) {
+      console.log('!!+++++++++++++++++++++++++++++++++++')
+      console.log(data)
+      console.log(data.fieldname)
+      console.log(data.filename)
+      console.log(data.encoding)
+      console.log(data.mimetype)
+      console.log(data.fields)
+      console.log('!!+++++++++++++++++++++++++++++++++++')
+      const sendData = await this.s3Service.uploadFile(data)
+      results.push(sendData)
+      console.log('sendData=', sendData)
+    }
+    return results
   }
 }
