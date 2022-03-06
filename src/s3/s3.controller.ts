@@ -47,7 +47,7 @@ export class S3Controller {
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Execute S3Controller.uploadFile()',
-    description: 'file upload',
+    description: 'Upload multiple files to S3',
   })
   @ApiResponse({
     status: 200,
